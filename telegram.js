@@ -14,6 +14,10 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 const CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
 
+console.log("BOT TOKEN EXISTS:", !!BOT_TOKEN);
+console.log("CHANNEL ID:", CHANNEL_ID);
+console.log("API URL:", `https://api.telegram.org/bot${BOT_TOKEN}/getMe`);
+
 // ==========================================
 // Upload Video
 // ==========================================
