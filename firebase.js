@@ -11,6 +11,10 @@ dotenv.config();
 // Service Account
 // ==========================================
 
+console.log("PROJECT ID =", process.env.FIREBASE_PROJECT_ID);
+console.log("TYPE =", process.env.FIREBASE_TYPE);
+console.log("CLIENT EMAIL =", process.env.FIREBASE_CLIENT_EMAIL);
+
 const serviceAccount = {
 
     type: process.env.FIREBASE_TYPE,
