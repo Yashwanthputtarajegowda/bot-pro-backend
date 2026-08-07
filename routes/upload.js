@@ -7,6 +7,7 @@ import multer from "multer";
 import fs from "fs-extra";
 
 import cloudinary from "../cloudinary.js";
+import { db } from "../firebase.js";
 
 const router = express.Router();
 
@@ -30,10 +31,7 @@ const storage = multer.diskStorage({
 
     filename(req, file, cb) {
 
-        const fileName =
-            Date.now() + "-" + file.originalname;
-
-        cb(null, fileName);
+        cb(null, Date.now() + "-" + file.originalname);
 
     }
 
@@ -101,15 +99,35 @@ router.post(
 
             const uploadResult = await cloudinary.uploader.upload(
 
-    req.file.path,
+                req.file.path,
 
-    {
-        resource_type: "video",
+                {
 
-        folder: "bot-pro/videos"
-    }
+                    resource_type: "video",
 
-);
+                    folder: "bot-pro/videos"
+
+                }
+
+            );
+
+            const postId = Date.now().toString();
+
+            await db.ref("posts/" + postId).set({
+
+                id: postId,
+
+                type: "video",
+
+                url: uploadResult.secure_url,
+
+                publicId: uploadResult.public_id,
+
+                caption: req.body.caption || "",
+
+                createdAt: Date.now()
+
+            });
 
             await fs.remove(req.file.path);
 
@@ -118,6 +136,8 @@ router.post(
                 success: true,
 
                 message: "Video Uploaded Successfully",
+
+                id: postId,
 
                 videoUrl: uploadResult.secure_url,
 
@@ -129,19 +149,23 @@ router.post(
 
         catch (error) {
 
-    console.error(error);
+            console.error(error);
 
-    res.status(500).json({
+            if (req.file) {
 
-        success: false,
+                await fs.remove(req.file.path).catch(() => {});
 
-        error: error.message,
+            }
 
-        stack: error.stack
+            res.status(500).json({
 
-    });
+                success: false,
 
-}
+                error: error.message
+
+            });
+
+        }
 
     }
 
