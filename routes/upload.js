@@ -6,7 +6,7 @@ import express from "express";
 import multer from "multer";
 import fs from "fs-extra";
 
-import { uploadVideoToTelegram } from "../telegram.js";
+import cloudinary from "../cloudinary.js";
 
 const router = express.Router();
 
@@ -99,28 +99,19 @@ router.post(
 
             }
 
-            const telegramResult =
-                await uploadVideoToTelegram(
+            const uploadResult = await cloudinary.uploader.upload(
 
-                    req.file.path,
+    req.file.path,
 
-                    req.body.caption || ""
+    {
+        resource_type: "video",
 
-                );
+        folder: "bot-pro/videos"
+    }
+
+);
 
             await fs.remove(req.file.path);
-
-            if (!telegramResult.success) {
-
-                return res.status(500).json({
-
-                    success: false,
-
-                    error: telegramResult.error
-
-                });
-
-            }
 
             res.json({
 
@@ -128,7 +119,9 @@ router.post(
 
                 message: "Video Uploaded Successfully",
 
-                telegram: telegramResult
+                videoUrl: uploadResult.secure_url,
+
+                publicId: uploadResult.public_id
 
             });
 
