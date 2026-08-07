@@ -61,6 +61,18 @@ router.get("/", (req, res) => {
 
 });
 
+router.get("/video", (req, res) => {
+
+    res.json({
+
+        success: true,
+
+        route: "Video Route Working"
+
+    });
+
+});
+
 // ==========================================
 // Upload Video
 // ==========================================
