@@ -33,6 +33,12 @@ export async function uploadVideoToTelegram(filePath, caption = "") {
             fs.createReadStream(filePath)
         );
 
+        console.log("BOT:", BOT_TOKEN);
+
+console.log("CHANNEL:", CHANNEL_ID);
+
+console.log("URL:", `https://api.telegram.org/bot${BOT_TOKEN}/sendVideo`);
+
         const response = await axios.post(
 
             `https://api.telegram.org/bot${BOT_TOKEN}/sendVideo`,
