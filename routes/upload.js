@@ -136,15 +136,19 @@ router.post(
 
         catch (error) {
 
-            res.status(500).json({
+    console.error(error);
 
-                success: false,
+    res.status(500).json({
 
-                error: error.message
+        success: false,
 
-            });
+        error: error.message,
 
-        }
+        stack: error.stack
+
+    });
+
+}
 
     }
 
