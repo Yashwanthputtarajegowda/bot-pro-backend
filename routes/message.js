@@ -1,6 +1,6 @@
 // ==========================================
 // Bot Pro Message Route
-// Firebase Real-Time Message System
+// Firebase Message + Seen System
 // ==========================================
 
 import express from "express";
@@ -69,14 +69,38 @@ router.post(
 
 
             // ==================================
+            // Clean Text
+            // ==================================
+
+            const cleanText =
+                text.trim();
+
+
+            if (!cleanText) {
+
+                return res.status(400).json({
+
+                    success: false,
+
+                    message:
+                        "Message cannot be empty"
+
+                });
+
+            }
+
+
+            // ==================================
             // Create Message Reference
             // ==================================
 
             const messageRef =
-                db.ref(
-                    "messages/" +
-                    chatId
-                ).push();
+                db
+                    .ref(
+                        "messages/" +
+                        chatId
+                    )
+                    .push();
 
 
             const messageId =
@@ -102,19 +126,26 @@ router.post(
                     receiverId,
 
                 text:
-                    text.trim(),
+                    cleanText,
 
                 createdAt:
                     Date.now(),
 
+                // ==============================
+                // Seen Status
+                // ==============================
+
                 seen:
-                    false
+                    false,
+
+                seenAt:
+                    null
 
             };
 
 
             // ==================================
-            // Save Firebase
+            // Save Message
             // ==================================
 
             await messageRef.set(
@@ -123,7 +154,7 @@ router.post(
 
 
             // ==================================
-            // Response
+            // Success Response
             // ==================================
 
             res.json({
@@ -161,8 +192,6 @@ router.post(
 
     }
 );
-
-
 // ==========================================
 // Get Chat Messages
 // ==========================================
@@ -241,6 +270,183 @@ router.get(
 
 
 // ==========================================
+// Mark Messages As Seen
+// ==========================================
+
+router.post(
+    "/seen/:chatId",
+    async (req, res) => {
+
+        try {
+
+            const chatId =
+                req.params.chatId;
+
+
+            const {
+                receiverId
+            } = req.body;
+
+
+            // ==================================
+            // Validate
+            // ==================================
+
+            if (!receiverId) {
+
+                return res.status(400).json({
+
+                    success: false,
+
+                    message:
+                        "receiverId is required"
+
+                });
+
+            }
+
+
+            // ==================================
+            // Firebase Reference
+            // ==================================
+
+            const messagesRef =
+                db.ref(
+                    "messages/" +
+                    chatId
+                );
+
+
+            const snapshot =
+                await messagesRef.once(
+                    "value"
+                );
+
+
+            const data =
+                snapshot.val();
+
+
+            if (!data) {
+
+                return res.json({
+
+                    success: true,
+
+                    message:
+                        "No messages found",
+
+                    updated:
+                        0
+
+                });
+
+            }
+
+
+            // ==================================
+            // Prepare Updates
+            // ==================================
+
+            const updates = {};
+
+            let updatedCount =
+                0;
+
+
+            Object.entries(data)
+                .forEach(
+                    ([messageId, message]) => {
+
+                        // ==========================
+                        // Only Receiver's Messages
+                        // ==========================
+
+                        if (
+                            message.receiverId ===
+                                receiverId &&
+                            message.seen !== true
+                        ) {
+
+                            updates[
+                                messageId +
+                                "/seen"
+                            ] = true;
+
+
+                            updates[
+                                messageId +
+                                "/seenAt"
+                            ] = Date.now();
+
+
+                            updatedCount++;
+
+                        }
+
+                    }
+                );
+
+
+            // ==================================
+            // Update Firebase
+            // ==================================
+
+            if (
+                Object.keys(updates).length >
+                0
+            ) {
+
+                await messagesRef.update(
+                    updates
+                );
+
+            }
+
+
+            // ==================================
+            // Response
+            // ==================================
+
+            res.json({
+
+                success: true,
+
+                message:
+                    "Messages Marked As Seen",
+
+                chatId:
+                    chatId,
+
+                updated:
+                    updatedCount
+
+            });
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Mark Seen Error:",
+                error
+            );
+
+
+            res.status(500).json({
+
+                success: false,
+
+                error:
+                    error.message
+
+            });
+
+        }
+
+    }
+);
+// ==========================================
 // REAL-TIME MESSAGE STREAM
 // ==========================================
 
@@ -278,14 +484,18 @@ router.get(
 
 
         // =====================================
-        // Send Connection Message
+        // Connected Event
         // =====================================
 
         res.write(
             `event: connected\n` +
             `data: ${JSON.stringify({
+
                 success: true,
-                chatId: chatId
+
+                chatId:
+                    chatId
+
             })}\n\n`
         );
 
@@ -302,7 +512,7 @@ router.get(
 
 
         // =====================================
-        // Firebase Real-Time Listener
+        // Firebase Listener
         // =====================================
 
         const listener =
@@ -328,7 +538,7 @@ router.get(
 
 
                     // =================================
-                    // Send Updated Messages
+                    // Send Messages To Browser
                     // =================================
 
                     res.write(
@@ -336,9 +546,15 @@ router.get(
                         `event: messages\n` +
 
                         `data: ${JSON.stringify({
+
                             success: true,
-                            chatId: chatId,
-                            messages: messages
+
+                            chatId:
+                                chatId,
+
+                            messages:
+                                messages
+
                         })}\n\n`
 
                     );
@@ -365,7 +581,7 @@ router.get(
 
 
         // =====================================
-        // Client Disconnect
+        // Disconnect Cleanup
         // =====================================
 
         req.on(
