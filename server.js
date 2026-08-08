@@ -9,6 +9,8 @@ import dotenv from "dotenv";
 import uploadRoutes from "./routes/upload.js";
 import messageRoutes from "./routes/message.js";
 
+import { requireAuth } from "./middleware/auth.js";
+
 dotenv.config();
 
 const app = express();
@@ -54,21 +56,23 @@ app.get("/", (req, res) => {
 
 
 // ==========================================
-// Upload Routes
+// Protected Upload Routes
 // ==========================================
 
 app.use(
     "/api/upload",
+    requireAuth,
     uploadRoutes
 );
 
 
 // ==========================================
-// Message Routes
+// Protected Message Routes
 // ==========================================
 
 app.use(
     "/api/messages",
+    requireAuth,
     messageRoutes
 );
 
@@ -103,6 +107,28 @@ app.use((req, res) => {
         success: false,
 
         message: "Route Not Found"
+
+    });
+
+});
+
+
+// ==========================================
+// Error Handler
+// ==========================================
+
+app.use((error, req, res, next) => {
+
+    console.error(
+        "❌ Server Error:",
+        error
+    );
+
+    res.status(500).json({
+
+        success: false,
+
+        error: "Internal server error."
 
     });
 
