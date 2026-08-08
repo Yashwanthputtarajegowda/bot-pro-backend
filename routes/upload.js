@@ -1,6 +1,7 @@
 // ==========================================
 // Bot Pro Upload Route
 // Video + Photo Upload
+// Home Feed Posts
 // ==========================================
 
 import express from "express";
@@ -28,7 +29,10 @@ const storage = multer.diskStorage({
 
     destination(req, file, cb) {
 
-        cb(null, "uploads/");
+        cb(
+            null,
+            "uploads/"
+        );
 
     },
 
@@ -36,67 +40,83 @@ const storage = multer.diskStorage({
 
         cb(
             null,
-            Date.now() + "-" + file.originalname
+            Date.now() +
+            "-" +
+            file.originalname
         );
 
     }
 
 });
 
-const upload = multer({
-    storage
-});
+
+const upload =
+    multer({
+        storage
+    });
 
 
 // ==========================================
 // Test API
 // ==========================================
 
-router.get("/", (req, res) => {
+router.get(
+    "/",
+    (req, res) => {
 
-    res.json({
+        res.json({
 
-        success: true,
+            success: true,
 
-        message: "Bot Pro Upload API Ready"
+            message:
+                "Bot Pro Upload API Ready"
 
-    });
+        });
 
-});
+    }
+);
 
 
 // ==========================================
 // Video Test
 // ==========================================
 
-router.get("/video", (req, res) => {
+router.get(
+    "/video",
+    (req, res) => {
 
-    res.json({
+        res.json({
 
-        success: true,
+            success: true,
 
-        route: "Video Route Working"
+            route:
+                "Video Route Working"
 
-    });
+        });
 
-});
+    }
+);
 
 
 // ==========================================
 // Photo Test
 // ==========================================
 
-router.get("/photo", (req, res) => {
+router.get(
+    "/photo",
+    (req, res) => {
 
-    res.json({
+        res.json({
 
-        success: true,
+            success: true,
 
-        route: "Photo Route Working"
+            route:
+                "Photo Route Working"
 
-    });
+        });
 
-});
+    }
+);
 
 
 // ==========================================
@@ -104,138 +124,15 @@ router.get("/photo", (req, res) => {
 // ==========================================
 
 router.post(
-
     "/video",
-
     upload.single("video"),
 
     async (req, res) => {
 
         try {
 
-            if (!req.file) {
-
-                return res.status(400).json({
-
-                    success: false,
-
-                    message: "No video selected"
-
-                });
-
-            }
-
-
-            const uploadResult =
-                await cloudinary.uploader.upload(
-
-                    req.file.path,
-
-                    {
-
-                        resource_type: "video",
-
-                        folder: "bot-pro/videos"
-
-                    }
-
-                );
-
-
-            const postId =
-                Date.now().toString();
-
-
-            await db
-                .ref("posts/" + postId)
-                .set({
-
-                    id: postId,
-
-                    type: "video",
-
-                    url: uploadResult.secure_url,
-
-                    publicId: uploadResult.public_id,
-
-                    caption:
-                        req.body.caption || "",
-
-                    createdAt:
-                        Date.now()
-
-                });
-
-
-            await fs.remove(
-                req.file.path
-            );
-
-
-            res.json({
-
-                success: true,
-
-                message:
-                    "Video Uploaded Successfully",
-
-                id: postId,
-
-                videoUrl:
-                    uploadResult.secure_url,
-
-                publicId:
-                    uploadResult.public_id
-
-            });
-
-        }
-
-        catch (error) {
-
-            console.error(error);
-
-
-            if (req.file) {
-
-                await fs
-                    .remove(req.file.path)
-                    .catch(() => {});
-
-            }
-
-
-            res.status(500).json({
-
-                success: false,
-
-                error: error.message
-
-            });
-
-        }
-
-    }
-
-);
-
-
-// ==========================================
-// Upload Photo
-// ==========================================
-
-router.post(
-
-    "/photo",
-
-    upload.single("photo"),
-
-    async (req, res) => {
-
-        try {
-
             // ==================================
-            // Check Photo
+            // Check Video
             // ==================================
 
             if (!req.file) {
@@ -244,7 +141,8 @@ router.post(
 
                     success: false,
 
-                    message: "No photo selected"
+                    message:
+                        "No video selected"
 
                 });
 
@@ -262,9 +160,11 @@ router.post(
 
                     {
 
-                        resource_type: "image",
+                        resource_type:
+                            "video",
 
-                        folder: "bot-pro/photos"
+                        folder:
+                            "bot-pro/videos"
 
                     }
 
@@ -280,16 +180,186 @@ router.post(
 
 
             // ==================================
-            // Save To Firebase
+            // Save Video To Firebase
             // ==================================
 
             await db
-                .ref("posts/" + postId)
+                .ref(
+                    "posts/" +
+                    postId
+                )
                 .set({
 
-                    id: postId,
+                    id:
+                        postId,
 
-                    type: "photo",
+                    type:
+                        "video",
+
+                    url:
+                        uploadResult.secure_url,
+
+                    publicId:
+                        uploadResult.public_id,
+
+                    caption:
+                        req.body.caption || "",
+
+                    createdAt:
+                        Date.now()
+
+                });
+
+
+            // ==================================
+            // Delete Temporary File
+            // ==================================
+
+            await fs.remove(
+                req.file.path
+            );
+
+
+            // ==================================
+            // Response
+            // ==================================
+
+            res.json({
+
+                success: true,
+
+                message:
+                    "Video Uploaded Successfully",
+
+                id:
+                    postId,
+
+                videoUrl:
+                    uploadResult.secure_url,
+
+                publicId:
+                    uploadResult.public_id
+
+            });
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Video Upload Error:",
+                error
+            );
+
+
+            // ==================================
+            // Remove Temporary File On Error
+            // ==================================
+
+            if (req.file) {
+
+                await fs
+                    .remove(
+                        req.file.path
+                    )
+                    .catch(
+                        () => {}
+                    );
+
+            }
+
+
+            res.status(500).json({
+
+                success: false,
+
+                error:
+                    error.message
+
+            });
+
+        }
+
+    }
+);
+
+
+// ==========================================
+// Upload Photo
+// ==========================================
+
+router.post(
+    "/photo",
+    upload.single("photo"),
+
+    async (req, res) => {
+
+        try {
+
+            // ==================================
+            // Check Photo
+            // ==================================
+
+            if (!req.file) {
+
+                return res.status(400).json({
+
+                    success: false,
+
+                    message:
+                        "No photo selected"
+
+                });
+
+            }
+
+
+            // ==================================
+            // Upload To Cloudinary
+            // ==================================
+
+            const uploadResult =
+                await cloudinary.uploader.upload(
+
+                    req.file.path,
+
+                    {
+
+                        resource_type:
+                            "image",
+
+                        folder:
+                            "bot-pro/photos"
+
+                    }
+
+                );
+
+
+            // ==================================
+            // Firebase Post ID
+            // ==================================
+
+            const postId =
+                Date.now().toString();
+
+
+            // ==================================
+            // Save Photo To Firebase
+            // ==================================
+
+            await db
+                .ref(
+                    "posts/" +
+                    postId
+                )
+                .set({
+
+                    id:
+                        postId,
+
+                    type:
+                        "photo",
 
                     url:
                         uploadResult.secure_url,
@@ -326,7 +396,8 @@ router.post(
                 message:
                     "Photo Uploaded Successfully",
 
-                id: postId,
+                id:
+                    postId,
 
                 photoUrl:
                     uploadResult.secure_url,
@@ -340,14 +411,25 @@ router.post(
 
         catch (error) {
 
-            console.error(error);
+            console.error(
+                "Photo Upload Error:",
+                error
+            );
 
+
+            // ==================================
+            // Remove Temporary File On Error
+            // ==================================
 
             if (req.file) {
 
                 await fs
-                    .remove(req.file.path)
-                    .catch(() => {});
+                    .remove(
+                        req.file.path
+                    )
+                    .catch(
+                        () => {}
+                    );
 
             }
 
@@ -356,14 +438,113 @@ router.post(
 
                 success: false,
 
-                error: error.message
+                error:
+                    error.message
 
             });
 
         }
 
     }
+);
 
+
+// ==========================================
+// Get Home Feed Posts
+// ==========================================
+
+router.get(
+    "/posts",
+
+    async (req, res) => {
+
+        try {
+
+            // ==================================
+            // Get Posts From Firebase
+            // ==================================
+
+            const snapshot =
+                await db
+                    .ref("posts")
+                    .once("value");
+
+
+            const data =
+                snapshot.val();
+
+
+            // ==================================
+            // Convert Firebase Object To Array
+            // ==================================
+
+            const posts =
+                data
+                    ? Object.values(data)
+                    : [];
+
+
+            // ==================================
+            // Sort Newest First
+            // ==================================
+
+            posts.sort(
+                (a, b) =>
+
+                    Number(
+                        b.createdAt || 0
+                    )
+
+                    -
+
+                    Number(
+                        a.createdAt || 0
+                    )
+
+            );
+
+
+            // ==================================
+            // Success Response
+            // ==================================
+
+            res.json({
+
+                success: true,
+
+                count:
+                    posts.length,
+
+                posts:
+                    posts
+
+            });
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Get Posts Error:",
+                error
+            );
+
+
+            res.status(500).json({
+
+                success: false,
+
+                message:
+                    "Unable to load posts",
+
+                error:
+                    error.message
+
+            });
+
+        }
+
+    }
 );
 
 
