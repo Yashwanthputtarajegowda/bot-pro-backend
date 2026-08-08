@@ -2,11 +2,13 @@
 // Bot Pro - Firebase Authentication Middleware
 // ==========================================
 
-const admin = require("firebase-admin");
+import admin from "../firebase.js";
 
-async function requireAuth(req, res, next) {
+export async function requireAuth(req, res, next) {
     try {
-        const authHeader = req.headers.authorization || "";
+
+        const authHeader =
+            req.headers.authorization || "";
 
         if (!authHeader.startsWith("Bearer ")) {
             return res.status(401).json({
@@ -15,7 +17,8 @@ async function requireAuth(req, res, next) {
             });
         }
 
-        const idToken = authHeader.substring(7).trim();
+        const idToken =
+            authHeader.substring(7).trim();
 
         if (!idToken) {
             return res.status(401).json({
@@ -24,9 +27,11 @@ async function requireAuth(req, res, next) {
             });
         }
 
+        // Verify Firebase ID Token
         const decodedToken =
             await admin.auth().verifyIdToken(idToken);
 
+        // Save verified user information
         req.user = decodedToken;
 
         req.userId = decodedToken.uid;
@@ -36,7 +41,7 @@ async function requireAuth(req, res, next) {
     } catch (error) {
 
         console.error(
-            "Firebase Auth Error:",
+            "❌ Firebase Auth Error:",
             error.message
         );
 
@@ -46,7 +51,3 @@ async function requireAuth(req, res, next) {
         });
     }
 }
-
-module.exports = {
-    requireAuth
-};
