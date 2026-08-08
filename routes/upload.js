@@ -2,6 +2,7 @@
 // Bot Pro Upload Route
 // Video + Photo Upload
 // Home Feed Posts
+// Like + Save + Comments
 // ==========================================
 
 import express from "express";
@@ -131,10 +132,6 @@ router.post(
 
         try {
 
-            // ==================================
-            // Check Video
-            // ==================================
-
             if (!req.file) {
 
                 return res.status(400).json({
@@ -148,10 +145,6 @@ router.post(
 
             }
 
-
-            // ==================================
-            // Upload To Cloudinary
-            // ==================================
 
             const uploadResult =
                 await cloudinary.uploader.upload(
@@ -171,17 +164,9 @@ router.post(
                 );
 
 
-            // ==================================
-            // Firebase Post ID
-            // ==================================
-
             const postId =
                 Date.now().toString();
 
-
-            // ==================================
-            // Save Video To Firebase
-            // ==================================
 
             await db
                 .ref(
@@ -211,18 +196,10 @@ router.post(
                 });
 
 
-            // ==================================
-            // Delete Temporary File
-            // ==================================
-
             await fs.remove(
                 req.file.path
             );
 
-
-            // ==================================
-            // Response
-            // ==================================
 
             res.json({
 
@@ -251,10 +228,6 @@ router.post(
                 error
             );
 
-
-            // ==================================
-            // Remove Temporary File On Error
-            // ==================================
 
             if (req.file) {
 
@@ -296,10 +269,6 @@ router.post(
 
         try {
 
-            // ==================================
-            // Check Photo
-            // ==================================
-
             if (!req.file) {
 
                 return res.status(400).json({
@@ -313,10 +282,6 @@ router.post(
 
             }
 
-
-            // ==================================
-            // Upload To Cloudinary
-            // ==================================
 
             const uploadResult =
                 await cloudinary.uploader.upload(
@@ -336,17 +301,9 @@ router.post(
                 );
 
 
-            // ==================================
-            // Firebase Post ID
-            // ==================================
-
             const postId =
                 Date.now().toString();
 
-
-            // ==================================
-            // Save Photo To Firebase
-            // ==================================
 
             await db
                 .ref(
@@ -376,18 +333,10 @@ router.post(
                 });
 
 
-            // ==================================
-            // Delete Temporary File
-            // ==================================
-
             await fs.remove(
                 req.file.path
             );
 
-
-            // ==================================
-            // Response
-            // ==================================
 
             res.json({
 
@@ -416,10 +365,6 @@ router.post(
                 error
             );
 
-
-            // ==================================
-            // Remove Temporary File On Error
-            // ==================================
 
             if (req.file) {
 
@@ -460,10 +405,6 @@ router.get(
 
         try {
 
-            // ==================================
-            // Get Posts From Firebase
-            // ==================================
-
             const snapshot =
                 await db
                     .ref("posts")
@@ -474,19 +415,11 @@ router.get(
                 snapshot.val();
 
 
-            // ==================================
-            // Convert Firebase Object To Array
-            // ==================================
-
             const posts =
                 data
                     ? Object.values(data)
                     : [];
 
-
-            // ==================================
-            // Sort Newest First
-            // ==================================
 
             posts.sort(
                 (a, b) =>
@@ -503,10 +436,6 @@ router.get(
 
             );
 
-
-            // ==================================
-            // Success Response
-            // ==================================
 
             res.json({
 
@@ -536,6 +465,538 @@ router.get(
 
                 message:
                     "Unable to load posts",
+
+                error:
+                    error.message
+
+            });
+
+        }
+
+    }
+);
+
+
+// ==========================================
+// LIKE / UNLIKE VIDEO
+// ==========================================
+
+router.post(
+    "/like/:postId",
+
+    async (req, res) => {
+
+        try {
+
+            const postId =
+                req.params.postId;
+
+
+            const {
+                userId
+            } = req.body;
+
+
+            if (!userId) {
+
+                return res.status(400).json({
+
+                    success: false,
+
+                    message:
+                        "userId is required"
+
+                });
+
+            }
+
+
+            const postRef =
+                db.ref(
+                    "posts/" +
+                    postId
+                );
+
+
+            const postSnapshot =
+                await postRef.once(
+                    "value"
+                );
+
+
+            if (!postSnapshot.exists()) {
+
+                return res.status(404).json({
+
+                    success: false,
+
+                    message:
+                        "Post not found"
+
+                });
+
+            }
+
+
+            const likeRef =
+                postRef
+                    .child("likes")
+                    .child(userId);
+
+
+            const likeSnapshot =
+                await likeRef.once(
+                    "value"
+                );
+
+
+            const alreadyLiked =
+                likeSnapshot.exists();
+
+
+            if (alreadyLiked) {
+
+                await likeRef.remove();
+
+            }
+
+            else {
+
+                await likeRef.set({
+
+                    userId:
+                        userId,
+
+                    createdAt:
+                        Date.now()
+
+                });
+
+            }
+
+
+            const likesSnapshot =
+                await postRef
+                    .child("likes")
+                    .once("value");
+
+
+            const likesData =
+                likesSnapshot.val();
+
+
+            const likeCount =
+                likesData
+                    ? Object.keys(
+                        likesData
+                    ).length
+                    : 0;
+
+
+            res.json({
+
+                success: true,
+
+                liked:
+                    !alreadyLiked,
+
+                likeCount:
+                    likeCount
+
+            });
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Like Error:",
+                error
+            );
+
+
+            res.status(500).json({
+
+                success: false,
+
+                error:
+                    error.message
+
+            });
+
+        }
+
+    }
+);
+
+
+// ==========================================
+// SAVE / UNSAVE VIDEO
+// ==========================================
+
+router.post(
+    "/save/:postId",
+
+    async (req, res) => {
+
+        try {
+
+            const postId =
+                req.params.postId;
+
+
+            const {
+                userId
+            } = req.body;
+
+
+            if (!userId) {
+
+                return res.status(400).json({
+
+                    success: false,
+
+                    message:
+                        "userId is required"
+
+                });
+
+            }
+
+
+            const postRef =
+                db.ref(
+                    "posts/" +
+                    postId
+                );
+
+
+            const postSnapshot =
+                await postRef.once(
+                    "value"
+                );
+
+
+            if (!postSnapshot.exists()) {
+
+                return res.status(404).json({
+
+                    success: false,
+
+                    message:
+                        "Post not found"
+
+                });
+
+            }
+
+
+            const saveRef =
+                postRef
+                    .child("saves")
+                    .child(userId);
+
+
+            const saveSnapshot =
+                await saveRef.once(
+                    "value"
+                );
+
+
+            const alreadySaved =
+                saveSnapshot.exists();
+
+
+            if (alreadySaved) {
+
+                await saveRef.remove();
+
+            }
+
+            else {
+
+                await saveRef.set({
+
+                    userId:
+                        userId,
+
+                    createdAt:
+                        Date.now()
+
+                });
+
+            }
+
+
+            res.json({
+
+                success: true,
+
+                saved:
+                    !alreadySaved
+
+            });
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Save Error:",
+                error
+            );
+
+
+            res.status(500).json({
+
+                success: false,
+
+                error:
+                    error.message
+
+            });
+
+        }
+
+    }
+);
+
+
+// ==========================================
+// ADD COMMENT
+// ==========================================
+
+router.post(
+    "/comment/:postId",
+
+    async (req, res) => {
+
+        try {
+
+            const postId =
+                req.params.postId;
+
+
+            const {
+                userId,
+                userName,
+                text
+            } = req.body;
+
+
+            if (
+                !userId ||
+                !text
+            ) {
+
+                return res.status(400).json({
+
+                    success: false,
+
+                    message:
+                        "userId and text are required"
+
+                });
+
+            }
+
+
+            const cleanText =
+                String(
+                    text
+                ).trim();
+
+
+            if (!cleanText) {
+
+                return res.status(400).json({
+
+                    success: false,
+
+                    message:
+                        "Comment cannot be empty"
+
+                });
+
+            }
+
+
+            const postRef =
+                db.ref(
+                    "posts/" +
+                    postId
+                );
+
+
+            const postSnapshot =
+                await postRef.once(
+                    "value"
+                );
+
+
+            if (!postSnapshot.exists()) {
+
+                return res.status(404).json({
+
+                    success: false,
+
+                    message:
+                        "Post not found"
+
+                });
+
+            }
+
+
+            const commentRef =
+                postRef
+                    .child("comments")
+                    .push();
+
+
+            const commentId =
+                commentRef.key;
+
+
+            const comment = {
+
+                id:
+                    commentId,
+
+                userId:
+                    userId,
+
+                userName:
+                    userName ||
+                    "User",
+
+                text:
+                    cleanText,
+
+                createdAt:
+                    Date.now()
+
+            };
+
+
+            await commentRef.set(
+                comment
+            );
+
+
+            res.json({
+
+                success: true,
+
+                message:
+                    "Comment Added",
+
+                comment:
+                    comment
+
+            });
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Comment Error:",
+                error
+            );
+
+
+            res.status(500).json({
+
+                success: false,
+
+                error:
+                    error.message
+
+            });
+
+        }
+
+    }
+);
+
+
+// ==========================================
+// GET COMMENTS
+// ==========================================
+
+router.get(
+    "/comments/:postId",
+
+    async (req, res) => {
+
+        try {
+
+            const postId =
+                req.params.postId;
+
+
+            const snapshot =
+                await db
+                    .ref(
+                        "posts/" +
+                        postId +
+                        "/comments"
+                    )
+                    .once("value");
+
+
+            const data =
+                snapshot.val();
+
+
+            const comments =
+                data
+                    ? Object.values(data)
+                    : [];
+
+
+            comments.sort(
+                (a, b) =>
+
+                    Number(
+                        a.createdAt || 0
+                    )
+
+                    -
+
+                    Number(
+                        b.createdAt || 0
+                    )
+
+            );
+
+
+            res.json({
+
+                success: true,
+
+                count:
+                    comments.length,
+
+                comments:
+                    comments
+
+            });
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Get Comments Error:",
+                error
+            );
+
+
+            res.status(500).json({
+
+                success: false,
 
                 error:
                     error.message
