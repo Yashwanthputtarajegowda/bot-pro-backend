@@ -395,7 +395,7 @@ router.post(
 
 
 // ==========================================
-// Get Home Feed Posts
+// GET HOME FEED POSTS
 // ==========================================
 
 router.get(
@@ -404,6 +404,11 @@ router.get(
     async (req, res) => {
 
         try {
+
+            console.log(
+                "📡 Loading posts for Home Feed..."
+            );
+
 
             const snapshot =
                 await db
@@ -434,6 +439,12 @@ router.get(
                         a.createdAt || 0
                     )
 
+            );
+
+
+            console.log(
+                "🎬 Posts found:",
+                posts.length
             );
 
 
@@ -475,8 +486,6 @@ router.get(
 
     }
 );
-
-
 // ==========================================
 // LIKE / UNLIKE VIDEO
 // ==========================================
@@ -919,14 +928,12 @@ router.post(
 
     }
 );
-
-
 // ==========================================
 // GET COMMENTS
 // ==========================================
 
 router.get(
-    "/comments/:postId",
+    "/comment/:postId",
 
     async (req, res) => {
 
@@ -943,7 +950,9 @@ router.get(
                         postId +
                         "/comments"
                     )
-                    .once("value");
+                    .once(
+                        "value"
+                    );
 
 
             const data =
@@ -958,17 +967,12 @@ router.get(
 
             comments.sort(
                 (a, b) =>
-
                     Number(
                         a.createdAt || 0
-                    )
-
-                    -
-
+                    ) -
                     Number(
                         b.createdAt || 0
                     )
-
             );
 
 
@@ -1010,7 +1014,206 @@ router.get(
 
 
 // ==========================================
-// Export
+// DELETE COMMENT
+// ==========================================
+
+router.delete(
+    "/comment/:postId/:commentId",
+
+    async (req, res) => {
+
+        try {
+
+            const postId =
+                req.params.postId;
+
+
+            const commentId =
+                req.params.commentId;
+
+
+            await db
+                .ref(
+                    "posts/" +
+                    postId +
+                    "/comments/" +
+                    commentId
+                )
+                .remove();
+
+
+            res.json({
+
+                success: true,
+
+                message:
+                    "Comment deleted"
+
+            });
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Delete Comment Error:",
+                error
+            );
+
+
+            res.status(500).json({
+
+                success: false,
+
+                error:
+                    error.message
+
+            });
+
+        }
+
+    }
+);
+
+
+// ==========================================
+// DELETE POST
+// ==========================================
+
+router.delete(
+    "/post/:postId",
+
+    async (req, res) => {
+
+        try {
+
+            const postId =
+                req.params.postId;
+
+
+            const postRef =
+                db.ref(
+                    "posts/" +
+                    postId
+                );
+
+
+            const snapshot =
+                await postRef.once(
+                    "value"
+                );
+
+
+            if (!snapshot.exists()) {
+
+                return res.status(404).json({
+
+                    success: false,
+
+                    message:
+                        "Post not found"
+
+                });
+
+            }
+
+
+            const post =
+                snapshot.val();
+
+
+            // ==================================
+            // Delete Cloudinary File
+            // ==================================
+
+            if (
+                post.publicId
+            ) {
+
+                try {
+
+                    await cloudinary
+                        .uploader
+                        .destroy(
+
+                            post.publicId,
+
+                            {
+
+                                resource_type:
+                                    post.type ===
+                                    "video"
+                                        ? "video"
+                                        : "image"
+
+                            }
+
+                        );
+
+                }
+
+                catch (
+                    cloudinaryError
+                ) {
+
+                    console.error(
+                        "Cloudinary Delete Error:",
+                        cloudinaryError
+                    );
+
+                }
+
+            }
+
+
+            // ==================================
+            // Delete Firebase Post
+            // ==================================
+
+            await postRef.remove();
+
+
+            res.json({
+
+                success: true,
+
+                message:
+                    "Post deleted"
+
+            });
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Delete Post Error:",
+                error
+            );
+
+
+            res.status(500).json({
+
+                success: false,
+
+                error:
+                    error.message
+
+            });
+
+        }
+
+    }
+);
+
+
+// ==========================================
+// EXPORT ROUTER
 // ==========================================
 
 export default router;
+
+
+// ==========================================
+// END OF BOT PRO UPLOAD ROUTE
+// ==========================================
