@@ -1,6 +1,6 @@
 // ==========================================
 // Bot Pro Message Route
-// Firebase Message + Seen System
+// Firebase Message + Seen + Delete System
 // ==========================================
 
 import express from "express";
@@ -132,14 +132,21 @@ router.post(
                     Date.now(),
 
                 // ==============================
-                // Seen Status
+                // Seen
                 // ==============================
 
                 seen:
                     false,
 
                 seenAt:
-                    null
+                    null,
+
+                // ==============================
+                // Delete For Me
+                // ==============================
+
+                deletedFor:
+                    {}
 
             };
 
@@ -154,7 +161,7 @@ router.post(
 
 
             // ==================================
-            // Success Response
+            // Success
             // ==================================
 
             res.json({
@@ -192,55 +199,116 @@ router.post(
 
     }
 );
+
+
 // ==========================================
-// Get Chat Messages
+// Delete Message For Me
 // ==========================================
 
-router.get(
-    "/:chatId",
+router.post(
+    "/delete-for-me",
     async (req, res) => {
 
         try {
 
-            const chatId =
-                req.params.chatId;
+            const {
+                chatId,
+                messageId,
+                userId
+            } = req.body;
+
+
+            // ==================================
+            // Validate
+            // ==================================
+
+            if (
+                !chatId ||
+                !messageId ||
+                !userId
+            ) {
+
+                return res.status(400).json({
+
+                    success: false,
+
+                    message:
+                        "chatId, messageId and userId are required"
+
+                });
+
+            }
+
+
+            // ==================================
+            // Message Reference
+            // ==================================
+
+            const messageRef =
+                db
+                    .ref(
+                        "messages/" +
+                        chatId +
+                        "/" +
+                        messageId
+                    );
 
 
             const snapshot =
-                await db
-                    .ref(
-                        "messages/" +
-                        chatId
-                    )
-                    .once("value");
+                await messageRef.once(
+                    "value"
+                );
 
 
-            const data =
+            const message =
                 snapshot.val();
 
 
-            const messages =
-                data
-                    ? Object.values(data)
-                    : [];
+            if (!message) {
+
+                return res.status(404).json({
+
+                    success: false,
+
+                    message:
+                        "Message not found"
+
+                });
+
+            }
 
 
-            messages.sort(
-                (a, b) =>
-                    a.createdAt -
-                    b.createdAt
-            );
+            // ==================================
+            // Delete For User
+            // ==================================
 
+            await messageRef.update({
+
+                [
+                    "deletedFor/" +
+                    userId
+                ]:
+                    true
+
+            });
+
+
+            // ==================================
+            // Success
+            // ==================================
 
             res.json({
 
                 success: true,
 
+                message:
+                    "Message Deleted For You",
+
                 chatId:
                     chatId,
 
-                messages:
-                    messages
+                messageId:
+                    messageId
 
             });
 
@@ -249,7 +317,156 @@ router.get(
         catch (error) {
 
             console.error(
-                "Get Messages Error:",
+                "Delete For Me Error:",
+                error
+            );
+
+
+            res.status(500).json({
+
+                success: false,
+
+                error:
+                    error.message
+
+            });
+
+        }
+
+    }
+);
+
+
+// ==========================================
+// Delete Message For Everyone
+// ==========================================
+
+router.post(
+    "/delete-for-everyone",
+    async (req, res) => {
+
+        try {
+
+            const {
+                chatId,
+                messageId,
+                userId
+            } = req.body;
+
+
+            // ==================================
+            // Validate
+            // ==================================
+
+            if (
+                !chatId ||
+                !messageId ||
+                !userId
+            ) {
+
+                return res.status(400).json({
+
+                    success: false,
+
+                    message:
+                        "chatId, messageId and userId are required"
+
+                });
+
+            }
+
+
+            // ==================================
+            // Message Reference
+            // ==================================
+
+            const messageRef =
+                db
+                    .ref(
+                        "messages/" +
+                        chatId +
+                        "/" +
+                        messageId
+                    );
+
+
+            const snapshot =
+                await messageRef.once(
+                    "value"
+                );
+
+
+            const message =
+                snapshot.val();
+
+
+            if (!message) {
+
+                return res.status(404).json({
+
+                    success: false,
+
+                    message:
+                        "Message not found"
+
+                });
+
+            }
+
+
+            // ==================================
+            // Only Sender Can Delete Everyone
+            // ==================================
+
+            if (
+                message.senderId !==
+                userId
+            ) {
+
+                return res.status(403).json({
+
+                    success: false,
+
+                    message:
+                        "Only the sender can delete this message for everyone"
+
+                });
+
+            }
+
+
+            // ==================================
+            // Delete Completely
+            // ==================================
+
+            await messageRef.remove();
+
+
+            // ==================================
+            // Success
+            // ==================================
+
+            res.json({
+
+                success: true,
+
+                message:
+                    "Message Deleted For Everyone",
+
+                chatId:
+                    chatId,
+
+                messageId:
+                    messageId
+
+            });
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Delete For Everyone Error:",
                 error
             );
 
@@ -358,10 +575,6 @@ router.post(
                 .forEach(
                     ([messageId, message]) => {
 
-                        // ==========================
-                        // Only Receiver's Messages
-                        // ==========================
-
                         if (
                             message.receiverId ===
                                 receiverId &&
@@ -447,6 +660,83 @@ router.post(
     }
 );
 // ==========================================
+// Get Chat Messages
+// ==========================================
+
+router.get(
+    "/:chatId",
+    async (req, res) => {
+
+        try {
+
+            const chatId =
+                req.params.chatId;
+
+
+            const snapshot =
+                await db
+                    .ref(
+                        "messages/" +
+                        chatId
+                    )
+                    .once("value");
+
+
+            const data =
+                snapshot.val();
+
+
+            const messages =
+                data
+                    ? Object.values(data)
+                    : [];
+
+
+            messages.sort(
+                (a, b) =>
+                    a.createdAt -
+                    b.createdAt
+            );
+
+
+            res.json({
+
+                success: true,
+
+                chatId:
+                    chatId,
+
+                messages:
+                    messages
+
+            });
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Get Messages Error:",
+                error
+            );
+
+
+            res.status(500).json({
+
+                success: false,
+
+                error:
+                    error.message
+
+            });
+
+        }
+
+    }
+);
+
+
+// ==========================================
 // REAL-TIME MESSAGE STREAM
 // ==========================================
 
@@ -520,44 +810,61 @@ router.get(
                 "value",
                 (snapshot) => {
 
-                    const data =
-                        snapshot.val();
+                    try {
+
+                        const data =
+                            snapshot.val();
 
 
-                    const messages =
-                        data
-                            ? Object.values(data)
-                            : [];
+                        const messages =
+                            data
+                                ? Object.values(data)
+                                : [];
 
 
-                    messages.sort(
-                        (a, b) =>
-                            a.createdAt -
-                            b.createdAt
-                    );
+                        // =================================
+                        // Sort Messages
+                        // =================================
+
+                        messages.sort(
+                            (a, b) =>
+                                a.createdAt -
+                                b.createdAt
+                        );
 
 
-                    // =================================
-                    // Send Messages To Browser
-                    // =================================
+                        // =================================
+                        // Send To Browser
+                        // =================================
 
-                    res.write(
+                        res.write(
 
-                        `event: messages\n` +
+                            `event: messages\n` +
 
-                        `data: ${JSON.stringify({
+                            `data: ${JSON.stringify({
 
-                            success: true,
+                                success: true,
 
-                            chatId:
-                                chatId,
+                                chatId:
+                                    chatId,
 
-                            messages:
-                                messages
+                                messages:
+                                    messages
 
-                        })}\n\n`
+                            })}\n\n`
 
-                    );
+                        );
+
+                    }
+
+                    catch (error) {
+
+                        console.error(
+                            "Stream Message Error:",
+                            error
+                        );
+
+                    }
 
                 }
             );
@@ -571,9 +878,22 @@ router.get(
             setInterval(
                 () => {
 
-                    res.write(
-                        `: heartbeat\n\n`
-                    );
+                    try {
+
+                        res.write(
+                            `: heartbeat\n\n`
+                        );
+
+                    }
+
+                    catch (error) {
+
+                        console.error(
+                            "Heartbeat Error:",
+                            error
+                        );
+
+                    }
 
                 },
                 25000
@@ -615,8 +935,6 @@ router.get(
 
     }
 );
-
-
 // ==========================================
 // Export
 // ==========================================
