@@ -7,12 +7,15 @@ import cors from "cors";
 import dotenv from "dotenv";
 
 import uploadRoutes from "./routes/upload.js";
+import messageRoutes from "./routes/message.js";
 
 dotenv.config();
 
 const app = express();
 
-const PORT = process.env.PORT || 3000;
+const PORT =
+    process.env.PORT || 3000;
+
 
 // ==========================================
 // Middlewares
@@ -22,7 +25,12 @@ app.use(cors());
 
 app.use(express.json());
 
-app.use(express.urlencoded({ extended: true }));
+app.use(
+    express.urlencoded({
+        extended: true
+    })
+);
+
 
 // ==========================================
 // Home Route
@@ -44,11 +52,26 @@ app.get("/", (req, res) => {
 
 });
 
+
 // ==========================================
 // Upload Routes
 // ==========================================
 
-app.use("/api/upload", uploadRoutes);
+app.use(
+    "/api/upload",
+    uploadRoutes
+);
+
+
+// ==========================================
+// Message Routes
+// ==========================================
+
+app.use(
+    "/api/messages",
+    messageRoutes
+);
+
 
 // ==========================================
 // Health Route
@@ -68,6 +91,7 @@ app.get("/health", (req, res) => {
 
 });
 
+
 // ==========================================
 // 404 Route
 // ==========================================
@@ -84,12 +108,18 @@ app.use((req, res) => {
 
 });
 
+
 // ==========================================
 // Start Server
 // ==========================================
 
-app.listen(PORT, () => {
+app.listen(
+    PORT,
+    () => {
 
-    console.log(`🚀 Bot Pro Backend Running On Port ${PORT}`);
+        console.log(
+            `🚀 Bot Pro Backend Running On Port ${PORT}`
+        );
 
-});
+    }
+);
