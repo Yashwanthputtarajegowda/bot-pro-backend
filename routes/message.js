@@ -1,6 +1,6 @@
 // ==========================================
 // Bot Pro Message Route
-// Firebase Message System
+// Firebase Real-Time Message System
 // ==========================================
 
 import express from "express";
@@ -19,7 +19,8 @@ router.get("/", (req, res) => {
 
         success: true,
 
-        message: "Bot Pro Message API Ready"
+        message:
+            "Bot Pro Message API Ready"
 
     });
 
@@ -30,124 +31,136 @@ router.get("/", (req, res) => {
 // Send Message
 // ==========================================
 
-router.post("/send", async (req, res) => {
+router.post(
+    "/send",
+    async (req, res) => {
 
-    try {
+        try {
 
-        const {
-            chatId,
-            senderId,
-            receiverId,
-            text
-        } = req.body;
+            const {
+                chatId,
+                senderId,
+                receiverId,
+                text
+            } = req.body;
 
 
-        // ==================================
-        // Validate
-        // ==================================
+            // ==================================
+            // Validate
+            // ==================================
 
-        if (
-            !chatId ||
-            !senderId ||
-            !receiverId ||
-            !text
-        ) {
+            if (
+                !chatId ||
+                !senderId ||
+                !receiverId ||
+                !text
+            ) {
 
-            return res.status(400).json({
+                return res.status(400).json({
 
-                success: false,
+                    success: false,
+
+                    message:
+                        "chatId, senderId, receiverId and text are required"
+
+                });
+
+            }
+
+
+            // ==================================
+            // Create Message Reference
+            // ==================================
+
+            const messageRef =
+                db.ref(
+                    "messages/" +
+                    chatId
+                ).push();
+
+
+            const messageId =
+                messageRef.key;
+
+
+            // ==================================
+            // Message Data
+            // ==================================
+
+            const message = {
+
+                id:
+                    messageId,
+
+                chatId:
+                    chatId,
+
+                senderId:
+                    senderId,
+
+                receiverId:
+                    receiverId,
+
+                text:
+                    text.trim(),
+
+                createdAt:
+                    Date.now(),
+
+                seen:
+                    false
+
+            };
+
+
+            // ==================================
+            // Save Firebase
+            // ==================================
+
+            await messageRef.set(
+                message
+            );
+
+
+            // ==================================
+            // Response
+            // ==================================
+
+            res.json({
+
+                success: true,
 
                 message:
-                    "chatId, senderId, receiverId and text are required"
+                    "Message Sent Successfully",
+
+                data:
+                    message
 
             });
 
         }
 
+        catch (error) {
 
-        // ==================================
-        // Create Message ID
-        // ==================================
-
-        const messageRef =
-            db.ref(
-                "messages/" +
-                chatId
-            ).push();
+            console.error(
+                "Message Send Error:",
+                error
+            );
 
 
-        const messageId =
-            messageRef.key;
+            res.status(500).json({
 
+                success: false,
 
-        // ==================================
-        // Message Data
-        // ==================================
+                error:
+                    error.message
 
-        const message = {
+            });
 
-            id: messageId,
-
-            chatId: chatId,
-
-            senderId: senderId,
-
-            receiverId: receiverId,
-
-            text: text.trim(),
-
-            createdAt: Date.now(),
-
-            seen: false
-
-        };
-
-
-        // ==================================
-        // Save Firebase
-        // ==================================
-
-        await messageRef.set(
-            message
-        );
-
-
-        // ==================================
-        // Success
-        // ==================================
-
-        res.json({
-
-            success: true,
-
-            message:
-                "Message Sent Successfully",
-
-            data: message
-
-        });
+        }
 
     }
-
-    catch (error) {
-
-        console.error(
-            "Message Send Error:",
-            error
-        );
-
-
-        res.status(500).json({
-
-            success: false,
-
-            error: error.message
-
-        });
-
-    }
-
-});
+);
 
 
 // ==========================================
@@ -194,9 +207,11 @@ router.get(
 
                 success: true,
 
-                chatId: chatId,
+                chatId:
+                    chatId,
 
-                messages: messages
+                messages:
+                    messages
 
             });
 
@@ -214,11 +229,173 @@ router.get(
 
                 success: false,
 
-                error: error.message
+                error:
+                    error.message
 
             });
 
         }
+
+    }
+);
+
+
+// ==========================================
+// REAL-TIME MESSAGE STREAM
+// ==========================================
+
+router.get(
+    "/stream/:chatId",
+    (req, res) => {
+
+        const chatId =
+            req.params.chatId;
+
+
+        // =====================================
+        // SSE Headers
+        // =====================================
+
+        res.setHeader(
+            "Content-Type",
+            "text/event-stream"
+        );
+
+        res.setHeader(
+            "Cache-Control",
+            "no-cache"
+        );
+
+        res.setHeader(
+            "Connection",
+            "keep-alive"
+        );
+
+        res.setHeader(
+            "X-Accel-Buffering",
+            "no"
+        );
+
+
+        // =====================================
+        // Send Connection Message
+        // =====================================
+
+        res.write(
+            `event: connected\n` +
+            `data: ${JSON.stringify({
+                success: true,
+                chatId: chatId
+            })}\n\n`
+        );
+
+
+        // =====================================
+        // Firebase Reference
+        // =====================================
+
+        const messagesRef =
+            db.ref(
+                "messages/" +
+                chatId
+            );
+
+
+        // =====================================
+        // Firebase Real-Time Listener
+        // =====================================
+
+        const listener =
+            messagesRef.on(
+                "value",
+                (snapshot) => {
+
+                    const data =
+                        snapshot.val();
+
+
+                    const messages =
+                        data
+                            ? Object.values(data)
+                            : [];
+
+
+                    messages.sort(
+                        (a, b) =>
+                            a.createdAt -
+                            b.createdAt
+                    );
+
+
+                    // =================================
+                    // Send Updated Messages
+                    // =================================
+
+                    res.write(
+
+                        `event: messages\n` +
+
+                        `data: ${JSON.stringify({
+                            success: true,
+                            chatId: chatId,
+                            messages: messages
+                        })}\n\n`
+
+                    );
+
+                }
+            );
+
+
+        // =====================================
+        // Keep Connection Alive
+        // =====================================
+
+        const heartbeat =
+            setInterval(
+                () => {
+
+                    res.write(
+                        `: heartbeat\n\n`
+                    );
+
+                },
+                25000
+            );
+
+
+        // =====================================
+        // Client Disconnect
+        // =====================================
+
+        req.on(
+            "close",
+            () => {
+
+                clearInterval(
+                    heartbeat
+                );
+
+
+                messagesRef.off(
+                    "value",
+                    listener
+                );
+
+
+                console.log(
+                    "🔌 Message stream closed:",
+                    chatId
+                );
+
+            }
+        );
+
+
+        console.log(
+            "🟢 Message stream connected:",
+            chatId
+        );
 
     }
 );
